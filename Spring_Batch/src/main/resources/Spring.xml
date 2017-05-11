@@ -1,0 +1,111 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:batch="http://www.springframework.org/schema/batch" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:task="http://www.springframework.org/schema/task"
+	xsi:schemaLocation="http://www.springframework.org/schema/batch
+	http://www.springframework.org/schema/batch/spring-batch-2.2.xsd
+	http://www.springframework.org/schema/beans
+	http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+	http://www.springframework.org/schema/context
+	http://www.springframework.org/schema/context/spring-context-2.5.xsd
+	http://www.springframework.org/schema/task
+	http://www.springframework.org/schema/task/spring-task-3.0.xsd">
+
+	<!-- batch:job id="helloWorldJob2"> <batch:step id="start" next="step2" 
+		allow-start-if-complete="true"> <tasklet ref="JJTasklet" /> </batch:step> 
+		<batch:step id="step2" next="finish" allow-start-if-complete="true"> <tasklet 
+		ref="newTasklet" /> </batch:step> <batch:step id="finish" allow-start-if-complete="true"> 
+		<tasklet ref="newTasklet2" /> </batch:step> </batch:job -->
+
+	<!-- batch:job id="jjBatchJob1"> <batch:step id="step1" allow-start-if-complete="true"> 
+		<batch:tasklet allow-start-if-complete="true"> <batch:chunk reader="jjreader" 
+		writer="jjwriter" commit-interval="10"> </batch:chunk> </batch:tasklet> </batch:step> 
+		</batch:job -->
+
+	<bean id="taskExecutor" class="org.springframework.core.task.SimpleAsyncTaskExecutor" />
+
+	<batch:job id="partitionJob22">
+		<batch:step id="masterStep" allow-start-if-complete="true">
+			<batch:partition step="slave" partitioner="jjpartitioner">
+				<batch:handler grid-size="10" task-executor="taskExecutor" />
+			</batch:partition>
+			<batch:next on="*" to="NormalStep" />
+			<batch:next on="JJ Exit" to="JJStep" />
+			<batch:listeners>
+				<batch:listener ref="jjStepListener"></batch:listener>
+			</batch:listeners>
+		</batch:step>
+		<batch:step id="NormalStep" allow-start-if-complete="true">
+			<batch:tasklet ref="normalTasklet"></batch:tasklet>
+		</batch:step>
+		<batch:step id="JJStep" allow-start-if-complete="true">
+			<batch:tasklet ref="jjTasklet"></batch:tasklet>
+		</batch:step>
+	</batch:job>
+
+	<batch:step id="slave">
+		<batch:tasklet allow-start-if-complete="true">
+			<batch:chunk reader="jjreader" processor="jjprocessor"
+				writer="jjwriter" commit-interval="1"></batch:chunk>
+			<batch:listeners>
+				<!-- promotion listener has to be on the chunck or tasklet level -->
+				<batch:listener ref="promotionListener">
+				</batch:listener>
+			</batch:listeners>
+		</batch:tasklet>
+	</batch:step>
+
+	<context:component-scan base-package="main.java"></context:component-scan>
+
+	<bean id="jobRepository"
+		class="org.springframework.batch.core.repository.support.JobRepositoryFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="databaseType" value="mysql" />
+		<property name="transactionManager" ref="transactionManager" />
+	</bean>
+
+	<bean id="promotionListener"
+		class="org.springframework.batch.core.listener.ExecutionContextPromotionListener">
+		<property name="keys" value="jjvalue" />
+	</bean>
+
+	<bean id="jobLauncher"
+		class="org.springframework.batch.core.launch.support.SimpleJobLauncher">
+		<property name="jobRepository" ref="jobRepository" />
+	</bean>
+
+	<bean id="dataSource"
+		class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+		<property name="driverClassName" value="com.mysql.jdbc.Driver" />
+		<property name="url"
+			value="jdbc:mysql://localhost:3306/world?useSSL=false" />
+		<property name="username" value="root" />
+		<property name="password" value="wenwen927" />
+	</bean>
+
+	<bean id="transactionManager"
+		class="org.springframework.batch.support.transaction.ResourcelessTransactionManager" />
+
+
+	<bean id="jobRegistry"
+		class="org.springframework.batch.core.configuration.support.MapJobRegistry" />
+
+	<task:scheduled-tasks>
+		<task:scheduled ref="runScheduler" method="run"
+			fixed-delay="5000" />
+	</task:scheduled-tasks>
+
+
+	<!-- batch:job id="reportJob1"> <batch:step id="step11" allow-start-if-complete="true"> 
+		<batch:tasklet> <batch:chunk reader="jjreader" writer="jjwriter" commit-interval="1"> 
+		</batch:chunk> </batch:tasklet> </batch:step> </batch:job> <bean id="cvsFileItemReader" 
+		class="org.springframework.batch.item.file.FlatFileItemReader"> <property 
+		name="resource" value="classpath:cvs/input/report.csv" /> <property name="lineMapper"> 
+		<bean class="org.springframework.batch.item.file.mapping.DefaultLineMapper"> 
+		<property name="lineTokenizer"> <bean class="org.springframework.batch.item.file.transform.DelimitedLineTokenizer"> 
+		<property name="names" value="id,impressions" /> </bean> </property> <property 
+		name="fieldSetMapper"> <bean class="org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper"> 
+		<property name="prototypeBeanName" value="report" /> </bean> </property> 
+		</bean> </property> </bean -->
+
+</beans>
